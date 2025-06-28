@@ -4,15 +4,14 @@ import mysql.connector
 from datetime import datetime
 import time
 import threading
-from AmbP3.voice_announcer import VoiceAnnouncer, LapTimeMonitor
+import numpy as np
+from AmbP3.voice_announcer import VoiceAnnouncer
 
+# --- Initialization ---
 app = Flask(__name__)
-
-# Initialize voice announcer with auto-detection of best engine
 voice_announcer = VoiceAnnouncer(enabled=True, engine='auto')
-lap_monitor = LapTimeMonitor(voice_announcer)
 
-# Database configuration from conf.yaml
+# --- Database Configuration ---
 DB_CONFIG = {
     'user': 'kart',
     'password': 'karts',
@@ -22,321 +21,261 @@ DB_CONFIG = {
 }
 
 def get_db_connection():
-    """Get MySQL database connection"""
+    """Establishes a new database connection."""
     return mysql.connector.connect(**DB_CONFIG)
 
-def get_recent_passes(limit=50):
-    """Get recent transponder passes"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    query = """
-    SELECT 
-        p.transponder_id,
-        p.rtc_time,
-        p.strength,
-        p.decoder_id,
-        c.car_number,
-        c.name
-    FROM passes p
-    LEFT JOIN cars c ON p.transponder_id = c.transponder_id
-    ORDER BY p.rtc_time DESC
-    LIMIT %s
-    """
-    
-    cursor.execute(query, (limit,))
-    results = cursor.fetchall()
-    
-    passes = []
-    for row in results:
-        # Convert RTC time (microseconds) to readable format
-        rtc_time_seconds = row[1] / 1000000
-        timestamp = datetime.fromtimestamp(rtc_time_seconds)
-        
-        passes.append({
-            'transponder_id': row[0],
-            'time': timestamp.strftime('%H:%M:%S.%f')[:-3],  # Show milliseconds
-            'raw_time': row[1],
-            'strength': row[2],
-            'decoder_id': row[3],
-            'car_number': row[4] if row[4] else 'Unknown',
-            'driver_name': row[5] if row[5] else 'Unknown'
-        })
-    
-    conn.close()
-    return passes
+# --- In-Memory Data Store ---
+# These global variables will hold the entire state of the application.
+all_laps_sorted = []  # A list of the most recent lap from each ponder, sorted by time.
+ponder_data = {}      # A dictionary holding detailed statistics and history for each ponder.
+data_lock = threading.Lock() # A lock to ensure thread-safe access to the data.
+last_processed_rtc_time = 0 # The timestamp of the last processed record to avoid redundant work.
 
-def calculate_lap_times():
-    """Calculate lap times for each transponder"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+
+# --- Data Processing Logic ---
+def calculate_stats(laps):
+    """Calculates standard deviation and moving average for a list of lap times."""
+    if not laps:
+        return None, None
     
-    # Get passes grouped by transponder, ordered by time
-    query = """
-    SELECT 
-        p.transponder_id,
-        p.rtc_time,
-        c.car_number,
-        c.name,
-        p.strength
-    FROM passes p
-    LEFT JOIN cars c ON p.transponder_id = c.transponder_id
-    ORDER BY p.transponder_id, p.rtc_time
+    std_dev = np.std(laps) if len(laps) > 1 else 0.0
+    
+    # Use all available laps for average if fewer than 10
+    num_laps_for_avg = min(len(laps), 10)
+    moving_avg = np.mean(laps[-num_laps_for_avg:])
+        
+    return std_dev, moving_avg
+
+def update_data_from_db():
     """
+    This function runs in a background thread.
+    It periodically fetches ONLY NEW passes from the database and updates the in-memory store.
+    """
+    global last_processed_rtc_time
+    print("Starting background data updater...")
     
-    cursor.execute(query)
-    results = cursor.fetchall()
-    
-    # Group by transponder and calculate lap times
-    transponder_data = {}
-    for row in results:
-        transponder_id = row[0]
-        rtc_time = row[1]
-        car_number = row[2] if row[2] else 'Unknown'
-        driver_name = row[3] if row[3] else 'Unknown'
-        strength = row[4]
+    while True:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            # Fetch only records newer than the last one we processed.
+            cursor.execute(
+                "SELECT p.transponder_id, p.rtc_time, c.car_number, c.name "
+                "FROM passes p LEFT JOIN cars c ON p.transponder_id = c.transponder_id "
+                "WHERE p.rtc_time > %s ORDER BY p.rtc_time ASC",
+                (last_processed_rtc_time,)
+            )
+            new_passes = cursor.fetchall()
+            conn.close()
+
+            if new_passes:
+                with data_lock:
+                    # The last pass in the fetched list is the most recent one.
+                    last_processed_rtc_time = new_passes[-1]['rtc_time']
+
+                    for p_pass in new_passes:
+                        ponder_id = p_pass['transponder_id']
+                        rtc_time = p_pass['rtc_time']
+
+                        # Initialize a data structure for a ponder if it's the first time we see it.
+                        if ponder_id not in ponder_data:
+                            ponder_data[ponder_id] = {
+                                'transponder_id': ponder_id,
+                                'car_number': p_pass['car_number'] or 'Unknown',
+                                'last_pass_time': None,
+                                'laps': [],
+                                'lap_history': [],
+                                'best_lap': float('inf'),
+                                'latest_lap': None,
+                                'moving_avg_10': None,
+                                'std_dev': None,
+                                'voice_enabled': False # Voice is off by default for all ponders.
+                            }
+                        
+                        pd = ponder_data[ponder_id]
+
+                        # A lap is the time between two consecutive passes.
+                        if pd['last_pass_time'] is not None:
+                            lap_time = (rtc_time - pd['last_pass_time']) / 1000000.0
+                            
+                            # Filter out unrealistic lap times (e.g., pit stops, errors).
+                            if 10.0 < lap_time < 300.0:
+                                timestamp = datetime.fromtimestamp(rtc_time / 1000000.0)
+                                
+                                # Update the ponder's data with the new lap.
+                                pd['laps'].append(lap_time)
+                                std_dev, moving_avg = calculate_stats(pd['laps'])
+                                pd['std_dev'] = std_dev
+                                pd['moving_avg_10'] = moving_avg
+                                pd['best_lap'] = min(pd['best_lap'], lap_time)
+                                pd['latest_lap'] = lap_time
+
+                                new_lap_record = {
+                                    'lap_number': len(pd['laps']),
+                                    'lap_time': lap_time,
+                                    'timestamp': timestamp,
+                                    'ponder_id': ponder_id,
+                                    'car_number': pd['car_number']
+                                }
+                                pd['lap_history'].append(new_lap_record)
+
+                                # Remove the old "latest lap" for this ponder from our sorted list.
+                                global all_laps_sorted
+                                all_laps_sorted = [l for l in all_laps_sorted if l['ponder_id'] != ponder_id]
+                                # Add the new lap to the very top of the list.
+                                all_laps_sorted.insert(0, new_lap_record)
+
+                                # Announce the lap time if voice is enabled for this ponder.
+                                if pd['voice_enabled']:
+                                    announcement = f"Ponder {pd['car_number']}, {lap_time:.2f}"
+                                    voice_announcer.announce(announcement)
+
+                        # Update the last pass time to the current one for the next calculation.
+                        pd['last_pass_time'] = rtc_time
+
+        except Exception as e:
+            print(f"Error in background thread: {e}")
         
-        if transponder_id not in transponder_data:
-            transponder_data[transponder_id] = {
-                'car_number': car_number,
-                'driver_name': driver_name,
-                'passes': [],
-                'laps': [],
-                'best_lap': None,
-                'last_lap': None,
-                'lap_count': 0
-            }
-        
-        transponder_data[transponder_id]['passes'].append({
-            'time': rtc_time,
-            'strength': strength
-        })
-    
-    # Calculate lap times
-    for transponder_id, data in transponder_data.items():
-        passes = data['passes']
-        if len(passes) > 1:
-            for i in range(1, len(passes)):
-                lap_time = (passes[i]['time'] - passes[i-1]['time']) / 1000000  # Convert to seconds
-                
-                # Filter reasonable lap times (between 10 seconds and 5 minutes)
-                if 10 <= lap_time <= 300:
-                    lap_data = {
-                        'lap_number': len(data['laps']) + 1,
-                        'time': lap_time,
-                        'formatted_time': format_lap_time(lap_time),
-                        'timestamp': datetime.fromtimestamp(passes[i]['time'] / 1000000)
+        time.sleep(1) # Wait for 1 second before checking for new data again.
+
+def initialize_data():
+    """
+    Pre-populates the in-memory data store on application startup.
+    This function performs one large read to build the initial state.
+    """
+    global last_processed_rtc_time
+    print("Initializing data from database...")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT p.transponder_id, p.rtc_time, c.car_number, c.name "
+            "FROM passes p LEFT JOIN cars c ON p.transponder_id = c.transponder_id "
+            "ORDER BY p.rtc_time ASC"
+        )
+        all_passes = cursor.fetchall()
+        conn.close()
+
+        if not all_passes:
+            print("No historical pass data found in the database.")
+            return
+
+        with data_lock:
+            last_processed_rtc_time = all_passes[-1]['rtc_time']
+            
+            # Group all passes by their transponder ID first.
+            passes_by_ponder = {}
+            for p_pass in all_passes:
+                ponder_id = p_pass['transponder_id']
+                if ponder_id not in passes_by_ponder:
+                    passes_by_ponder[ponder_id] = []
+                passes_by_ponder[ponder_id].append(p_pass)
+
+            # Process the history for each ponder.
+            for ponder_id, passes in passes_by_ponder.items():
+                if ponder_id not in ponder_data:
+                     ponder_data[ponder_id] = {
+                        'transponder_id': ponder_id, 'car_number': passes[0]['car_number'] or 'Unknown',
+                        'last_pass_time': None, 'laps': [], 'lap_history': [], 'best_lap': float('inf'),
+                        'latest_lap': None, 'moving_avg_10': None, 'std_dev': None, 'voice_enabled': False
                     }
-                    
-                    data['laps'].append(lap_data)
-                    data['last_lap'] = lap_data
-                    data['lap_count'] = len(data['laps'])
-                    
-                    # Update best lap
-                    if data['best_lap'] is None or lap_time < data['best_lap']['time']:
-                        data['best_lap'] = lap_data
-    
-    conn.close()
-    return transponder_data
+                pd = ponder_data[ponder_id]
 
-def format_lap_time(seconds):
-    """Format lap time as MM:SS.mmm"""
-    minutes = int(seconds // 60)
-    remaining_seconds = seconds % 60
-    return f"{minutes}:{remaining_seconds:06.3f}"
+                # Calculate all historical laps.
+                for i in range(1, len(passes)):
+                    lap_time = (passes[i]['rtc_time'] - passes[i-1]['rtc_time']) / 1000000.0
+                    if 10.0 < lap_time < 300.0:
+                        pd['laps'].append(lap_time)
+                        pd['lap_history'].append({
+                            'lap_number': len(pd['laps']), 'lap_time': lap_time,
+                            'timestamp': datetime.fromtimestamp(passes[i]['rtc_time'] / 1000000.0),
+                            'ponder_id': ponder_id, 'car_number': pd['car_number']
+                        })
+                
+                # After processing all laps, calculate the final statistics.
+                if pd['laps']:
+                    std_dev, moving_avg = calculate_stats(pd['laps'])
+                    pd['std_dev'] = std_dev
+                    pd['moving_avg_10'] = moving_avg
+                    pd['best_lap'] = min(pd['laps'])
+                    pd['latest_lap'] = pd['laps'][-1]
+                    
+                    # Add its most recent lap to the global sorted list.
+                    all_laps_sorted.append(pd['lap_history'][-1])
 
+        # Finally, sort the list of latest laps by timestamp to ensure the newest is first.
+        with data_lock:
+            all_laps_sorted.sort(key=lambda x: x['timestamp'], reverse=True)
+        print(f"Initialization complete. Loaded {len(all_laps_sorted)} final laps.")
+
+    except Exception as e:
+        print(f"Error during data initialization: {e}")
+
+
+# --- Flask API Endpoints ---
 @app.route('/')
 def index():
-    """Main page showing live lap times"""
+    """Serves the main dashboard page."""
     return render_template('index.html')
 
-@app.route('/api/lap_times')
-def api_lap_times():
-    """API endpoint for current lap times (max 16 karts)"""
-    try:
-        lap_data = calculate_lap_times()
-        
-        # Convert to list and include karts with recent activity (even if no completed laps)
-        results = []
-        for transponder_id, data in lap_data.items():
-            # Show karts that have completed laps OR have recent activity (within last 5 minutes)
-            last_pass_time = None
-            if data['passes']:
-                last_pass_time = data['passes'][-1]['time']
-                time_since_last = (time.time() * 1000000 - last_pass_time) / 1000000  # seconds
-                
-            show_kart = (data['lap_count'] > 0 or 
-                        (last_pass_time and time_since_last < 300))  # 5 minutes
-            
-            if show_kart:
-                results.append({
-                    'transponder_id': transponder_id,
-                    'car_number': data['car_number'],
-                    'driver_name': data['driver_name'],
-                    'lap_count': data['lap_count'],
-                    'last_lap_time': data['last_lap']['formatted_time'] if data['last_lap'] else '-',
-                    'best_lap_time': data['best_lap']['formatted_time'] if data['best_lap'] else '-',
-                    'last_activity': data['last_lap']['timestamp'].strftime('%H:%M:%S') if data['last_lap'] else 
-                                   (datetime.fromtimestamp(last_pass_time / 1000000).strftime('%H:%M:%S') if last_pass_time else '-'),
-                    'status': 'Racing' if data['lap_count'] > 0 else 'On Track'
+@app.route('/laps/<int:transponder_id>')
+def lap_details(transponder_id):
+    """Serves the detail page for a single ponder."""
+    return render_template('laps.html', transponder_id=transponder_id)
+
+@app.route('/api/all_laps')
+def api_all_laps():
+    """API endpoint for the main page. Returns the sorted list of latest laps with all stats."""
+    response_data = []
+    with data_lock:
+        for lap_record in all_laps_sorted:
+            ponder_id = lap_record['ponder_id']
+            pd = ponder_data.get(ponder_id)
+            if pd:
+                response_data.append({
+                    'ponder_id': ponder_id,
+                    'car_number': pd['car_number'],
+                    'latest_lap_time': f"{pd['latest_lap']:.3f}" if pd['latest_lap'] is not None else '-',
+                    'best_lap_time': f"{pd['best_lap']:.3f}" if pd['best_lap'] != float('inf') else '-',
+                    'moving_avg_10': f"{pd['moving_avg_10']:.3f}" if pd['moving_avg_10'] is not None else '-',
+                    'std_dev': f"{pd['std_dev']:.3f}" if pd['std_dev'] is not None else '-',
+                    'timestamp': lap_record['timestamp'].strftime('%H:%M:%S'),
+                    'voice_enabled': pd['voice_enabled']
                 })
-        
-        # Sort by lap count (desc), then by best lap time (asc), then by recent activity
-        results.sort(key=lambda x: (
-            -x['lap_count'],  # More laps first
-            999999 if x['best_lap_time'] == '-' else float(x['best_lap_time'].replace(':', '')) if ':' in str(x['best_lap_time']) else 999999,  # Best lap time
-            x['last_activity'] if x['last_activity'] != '-' else '00:00:00'
-        ), reverse=True)
-        
-        # Limit to 16 cars maximum
-        results = results[:16]
-        
-        # Update lap monitor for voice announcements
-        lap_monitor.update_lap_data(results)
-        
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return jsonify(response_data)
 
-@app.route('/api/recent_passes')
-def api_recent_passes():
-    """API endpoint for recent transponder passes"""
-    try:
-        passes = get_recent_passes(20)
-        return jsonify(passes)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/voice/settings', methods=['GET', 'POST'])
-def api_voice_settings():
-    """API endpoint for voice settings"""
-    if request.method == 'GET':
-        # Get current settings with fallback values
-        volume = 0.9
-        rate = 150
-        
-        if voice_announcer.engine and hasattr(voice_announcer.engine, 'getProperty'):
-            try:
-                volume = voice_announcer.engine.getProperty('volume')
-                rate = voice_announcer.engine.getProperty('rate')
-            except:
-                pass
-        
-        return jsonify({
-            'enabled': voice_announcer.enabled,
-            'volume': volume,
-            'rate': rate,
-            'engine_type': voice_announcer.engine_type
-        })
-    
-    elif request.method == 'POST':
-        try:
-            data = request.get_json()
-            
-            if 'enabled' in data:
-                voice_announcer.set_enabled(data['enabled'])
-            
-            if 'volume' in data:
-                voice_announcer.set_volume(data['volume'])
-            
-            if 'rate' in data:
-                voice_announcer.set_rate(data['rate'])
-            
-            return jsonify({'status': 'success'})
-        
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-@app.route('/api/voice/test', methods=['POST'])
-def api_voice_test():
-    """Test voice announcement"""
-    try:
-        voice_announcer.test_voice()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/voice/announce', methods=['POST'])
-def api_voice_announce():
-    """Manual voice announcement"""
-    try:
-        data = request.get_json()
-        text = data.get('text', '')
-        
-        if text:
-            voice_announcer.announce(text)
-            return jsonify({'status': 'success'})
+@app.route('/api/laps/<int:transponder_id>')
+def api_lap_details(transponder_id):
+    """API endpoint for the detail page. Returns all historical data for a single ponder."""
+    with data_lock:
+        data = ponder_data.get(transponder_id)
+        if data:
+            # Create a copy to avoid sending the raw 'laps' list, which can be large.
+            response = {k: v for k, v in data.items() if k != 'laps'}
+            return jsonify(response)
         else:
-            return jsonify({'error': 'No text provided'}), 400
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            return jsonify({'error': 'Transponder not found'}), 404
 
-@app.route('/api/race/reset', methods=['POST'])
-def api_race_reset():
-    """Reset race state"""
-    try:
-        lap_monitor.reset_race()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/voice/announce_all', methods=['POST'])
-def api_announce_all_times():
-    """Announce all cars' current times"""
-    try:
-        # Get current lap data
-        lap_data = calculate_lap_times()
-        
-        # Convert to list format expected by lap monitor
-        results = []
-        for transponder_id, data in lap_data.items():
-            if data['lap_count'] > 0:  # Only include cars with completed laps
-                results.append({
-                    'transponder_id': transponder_id,
-                    'car_number': data['car_number'],
-                    'lap_count': data['lap_count'],
-                    'best_lap_time': data['best_lap']['formatted_time'] if data['best_lap'] else '-'
-                })
-        
-        # Sort by lap count and best time (same as main API)
-        results.sort(key=lambda x: (
-            -x['lap_count'],
-            999999 if x['best_lap_time'] == '-' else float(x['best_lap_time'].replace(':', '')) if ':' in str(x['best_lap_time']) else 999999
-        ), reverse=True)
-        
-        # Trigger announcement
-        lap_monitor._announce_all_times(results)
-        
-        return jsonify({'status': 'success', 'cars_announced': len(results)})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/voice/announcement_settings', methods=['GET', 'POST'])
-def api_announcement_settings():
-    """API endpoint for voice announcement settings"""
-    if request.method == 'GET':
-        settings = lap_monitor.get_announcement_settings()
-        return jsonify(settings)
-    
-    elif request.method == 'POST':
-        try:
+@app.route('/api/voice_toggle/<int:transponder_id>', methods=['POST'])
+def api_voice_toggle(transponder_id):
+    """API endpoint to toggle voice announcements for a specific ponder."""
+    with data_lock:
+        if transponder_id in ponder_data:
             data = request.get_json()
-            
-            announce_car_numbers = data.get('announce_car_numbers', False)
-            announce_lap_numbers = data.get('announce_lap_numbers', False)
-            announce_all_times_enabled = data.get('announce_all_times_enabled', False)
-            
-            lap_monitor.set_announcement_mode(
-                announce_car_numbers=announce_car_numbers,
-                announce_lap_numbers=announce_lap_numbers,
-                announce_all_times_enabled=announce_all_times_enabled
-            )
-            
-            return jsonify({'status': 'success'})
-        
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            new_state = data.get('enabled', False)
+            ponder_data[transponder_id]['voice_enabled'] = new_state
+            print(f"Set voice for ponder {transponder_id} to {new_state}")
+            return jsonify({'status': 'success', 'new_state': new_state})
+        else:
+            return jsonify({'error': 'Transponder not found'}), 404
 
+# --- Main Execution ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    initialize_data()
+    # Start the background thread to fetch data continuously.
+    # 'daemon=True' ensures the thread exits when the main app does.
+    update_thread = threading.Thread(target=update_data_from_db, daemon=True)
+    update_thread.start()
+    # 'use_reloader=False' is important when running background threads with Flask's dev server.
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
