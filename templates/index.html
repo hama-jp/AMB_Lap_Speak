@@ -53,7 +53,13 @@
             margin-top: 20px;
         }
         
-        .lap-times-section, .recent-passes-section {
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .lap-times-section, .recent-passes-section, .voice-control-section {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 15px;
@@ -176,6 +182,111 @@
             margin-top: 20px;
         }
         
+        /* Voice Control Styles */
+        .voice-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .control-group label {
+            font-weight: bold;
+            min-width: 60px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        
+        .toggle-switch input {
+            display: none;
+        }
+        
+        .slider {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 24px;
+            transition: background 0.3s;
+        }
+        
+        .slider:before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        
+        .toggle-switch input:checked + .slider {
+            background: #4caf50;
+        }
+        
+        .toggle-switch input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .volume-slider, .rate-slider {
+            flex: 1;
+            min-width: 100px;
+            height: 5px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .volume-slider::-webkit-slider-thumb, .rate-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #4caf50;
+            cursor: pointer;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 8px 16px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+        
+        .control-btn:hover {
+            background: #1976d2;
+        }
+        
+        .control-btn:active {
+            transform: translateY(1px);
+        }
+        
         @media (max-width: 768px) {
             .timing-grid {
                 grid-template-columns: 1fr;
@@ -187,6 +298,15 @@
             
             .lap-times-table {
                 font-size: 0.9em;
+            }
+            
+            .control-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .control-buttons {
+                flex-direction: column;
             }
         }
     </style>
@@ -206,10 +326,71 @@
                 </div>
             </div>
             
-            <div class="recent-passes-section">
-                <h2 class="section-title">Recent Passes</h2>
-                <div id="recent-passes-content">
-                    <div class="loading">Loading recent passes...</div>
+            <div class="side-panel">
+                <div class="recent-passes-section">
+                    <h2 class="section-title">Recent Passes</h2>
+                    <div id="recent-passes-content">
+                        <div class="loading">Loading recent passes...</div>
+                    </div>
+                </div>
+                
+                <div class="voice-control-section">
+                    <h2 class="section-title">🔊 Voice Control</h2>
+                    <div class="voice-controls">
+                        <div class="control-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="voice-enabled" checked>
+                                <span class="slider"></span>
+                                <span class="label-text">Enable Voice</span>
+                            </label>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="voice-volume">Volume:</label>
+                            <input type="range" id="voice-volume" min="0" max="100" value="90" class="volume-slider">
+                            <span id="volume-value">90%</span>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="voice-rate">Speed:</label>
+                            <input type="range" id="voice-rate" min="50" max="300" value="150" class="rate-slider">
+                            <span id="rate-value">150 WPM</span>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label>Announcement Style:</label>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="announce-car-numbers">
+                                <span class="slider"></span>
+                                <span class="label-text">Include Car Numbers</span>
+                            </label>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="announce-lap-numbers">
+                                <span class="slider"></span>
+                                <span class="label-text">Include Lap Numbers</span>
+                            </label>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="announce-all-times-enabled">
+                                <span class="slider"></span>
+                                <span class="label-text">Periodic All Times (30s)</span>
+                            </label>
+                        </div>
+                        
+                        <div class="control-buttons">
+                            <button id="test-voice" class="control-btn">Test Voice</button>
+                            <button id="announce-all" class="control-btn">Announce All Times</button>
+                            <button id="reset-race" class="control-btn">Reset Race</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -335,7 +516,208 @@
             updateLastUpdateTime();
         }
         
+        // Voice control functionality
+        let voiceSettings = {
+            enabled: true,
+            volume: 90,
+            rate: 150
+        };
+        
+        let announcementSettings = {
+            announce_car_numbers: false,
+            announce_lap_numbers: false,
+            announce_all_times_enabled: false
+        };
+        
+        // Load voice settings
+        async function loadVoiceSettings() {
+            try {
+                const response = await fetch('/api/voice/settings');
+                if (response.ok) {
+                    const settings = await response.json();
+                    voiceSettings.enabled = settings.enabled;
+                    voiceSettings.volume = Math.round(settings.volume * 100);
+                    voiceSettings.rate = settings.rate;
+                    
+                    updateVoiceControls();
+                }
+            } catch (error) {
+                console.error('Failed to load voice settings:', error);
+            }
+        }
+        
+        // Load announcement settings
+        async function loadAnnouncementSettings() {
+            try {
+                const response = await fetch('/api/voice/announcement_settings');
+                if (response.ok) {
+                    const settings = await response.json();
+                    announcementSettings.announce_car_numbers = settings.announce_car_numbers;
+                    announcementSettings.announce_lap_numbers = settings.announce_lap_numbers;
+                    announcementSettings.announce_all_times_enabled = settings.announce_all_times_enabled;
+                    
+                    updateAnnouncementControls();
+                }
+            } catch (error) {
+                console.error('Failed to load announcement settings:', error);
+            }
+        }
+        
+        // Update voice control UI
+        function updateVoiceControls() {
+            document.getElementById('voice-enabled').checked = voiceSettings.enabled;
+            document.getElementById('voice-volume').value = voiceSettings.volume;
+            document.getElementById('voice-rate').value = voiceSettings.rate;
+            document.getElementById('volume-value').textContent = voiceSettings.volume + '%';
+            document.getElementById('rate-value').textContent = voiceSettings.rate + ' WPM';
+        }
+        
+        // Update announcement control UI
+        function updateAnnouncementControls() {
+            document.getElementById('announce-car-numbers').checked = announcementSettings.announce_car_numbers;
+            document.getElementById('announce-lap-numbers').checked = announcementSettings.announce_lap_numbers;
+            document.getElementById('announce-all-times-enabled').checked = announcementSettings.announce_all_times_enabled;
+        }
+        
+        // Save voice settings
+        async function saveVoiceSettings() {
+            try {
+                const response = await fetch('/api/voice/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        enabled: voiceSettings.enabled,
+                        volume: voiceSettings.volume / 100,
+                        rate: voiceSettings.rate
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to save voice settings');
+                }
+            } catch (error) {
+                console.error('Error saving voice settings:', error);
+            }
+        }
+        
+        // Save announcement settings
+        async function saveAnnouncementSettings() {
+            try {
+                const response = await fetch('/api/voice/announcement_settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(announcementSettings)
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to save announcement settings');
+                }
+            } catch (error) {
+                console.error('Error saving announcement settings:', error);
+            }
+        }
+        
+        // Voice control event listeners
+        document.getElementById('voice-enabled').addEventListener('change', function() {
+            voiceSettings.enabled = this.checked;
+            saveVoiceSettings();
+        });
+        
+        document.getElementById('voice-volume').addEventListener('input', function() {
+            voiceSettings.volume = parseInt(this.value);
+            document.getElementById('volume-value').textContent = voiceSettings.volume + '%';
+            saveVoiceSettings();
+        });
+        
+        document.getElementById('voice-rate').addEventListener('input', function() {
+            voiceSettings.rate = parseInt(this.value);
+            document.getElementById('rate-value').textContent = voiceSettings.rate + ' WPM';
+            saveVoiceSettings();
+        });
+        
+        // Announcement control event listeners
+        document.getElementById('announce-car-numbers').addEventListener('change', function() {
+            announcementSettings.announce_car_numbers = this.checked;
+            saveAnnouncementSettings();
+        });
+        
+        document.getElementById('announce-lap-numbers').addEventListener('change', function() {
+            announcementSettings.announce_lap_numbers = this.checked;
+            saveAnnouncementSettings();
+        });
+        
+        document.getElementById('announce-all-times-enabled').addEventListener('change', function() {
+            announcementSettings.announce_all_times_enabled = this.checked;
+            saveAnnouncementSettings();
+        });
+        
+        document.getElementById('test-voice').addEventListener('click', async function() {
+            try {
+                const response = await fetch('/api/voice/test', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    this.textContent = 'Testing...';
+                    setTimeout(() => {
+                        this.textContent = 'Test Voice';
+                    }, 3000);
+                } else {
+                    console.error('Voice test failed');
+                }
+            } catch (error) {
+                console.error('Error testing voice:', error);
+            }
+        });
+        
+        document.getElementById('announce-all').addEventListener('click', async function() {
+            try {
+                const response = await fetch('/api/voice/announce_all', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    this.textContent = `Announced ${result.cars_announced} cars`;
+                    setTimeout(() => {
+                        this.textContent = 'Announce All Times';
+                    }, 3000);
+                } else {
+                    console.error('Announce all times failed');
+                }
+            } catch (error) {
+                console.error('Error announcing all times:', error);
+            }
+        });
+        
+        document.getElementById('reset-race').addEventListener('click', async function() {
+            if (confirm('Reset race data? This will clear all current lap times.')) {
+                try {
+                    const response = await fetch('/api/race/reset', {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        this.textContent = 'Reset!';
+                        setTimeout(() => {
+                            this.textContent = 'Reset Race';
+                        }, 2000);
+                    } else {
+                        console.error('Race reset failed');
+                    }
+                } catch (error) {
+                    console.error('Error resetting race:', error);
+                }
+            }
+        });
+        
         // Initial load
+        loadVoiceSettings();
+        loadAnnouncementSettings();
         updateData();
         
         // Update every 2 seconds
