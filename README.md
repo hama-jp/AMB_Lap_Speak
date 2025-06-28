@@ -1,42 +1,46 @@
-# AMB RC Timer - Real-time RC Car Timing System
+# AMB Lap Speak - RC Practice Lap Timer
 
-**AMB P3 Decoder Compatible RC Car Timing System with Japanese Voice Announcements**
+**An AMB P3 Decoder-compatible RC car lap timer, specialized for personal practice sessions, with Japanese voice announcements.**
 
-A professional timing system that displays lap times in real-time and announces race status in natural Japanese voice synthesis.
+This system is designed to help individual drivers improve their skills by providing detailed, real-time lap data and performance statistics.
 
 [🇯🇵 日本語版README](README_ja.md) | [🇺🇸 English Version](README.md)
 
 ## 🎯 Key Features
 
-- 🏁 **Real-time Lap Timing**: Connect to AMB P3 decoders and track transponder passes
-- 📊 **Live Web Dashboard**: Real-time display of lap times for up to 16 RC cars
-- 🗣️ **Japanese Voice Announcements**: Natural Japanese race commentary using Google TTS
-- 🗄️ **MySQL Database**: Persistent storage of all timing data
-- ⏱️ **Automatic Lap Calculation**: Intelligent filtering of valid laps only
-- 🔄 **Auto-refresh Interface**: Web dashboard updates every 2 seconds
-- 📱 **Responsive Design**: Mobile-friendly interface for trackside use
-- 🏆 **Race Management**: Automatic tracking of best laps, lap counts, and driver positions
+- 🚗 **Practice-Focused Dashboard**: Displays the most recent lap from any car at the top of the screen.
+- 📈 **In-Depth Statistics**: For each car, view the best lap, 10-lap moving average, and standard deviation to gauge consistency.
+- 📊 **Visual Lap History**: Click on any ponder to see a detailed lap history page with a chart visualizing lap time progression.
+- 🗣️ **Per-Ponder Voice Announcements**: Toggle Japanese voice announcements for individual cars, so you only hear the times you care about.
+- ⏱️ **Real-time Data**: Connects to AMB P3 decoders to capture transponder passes instantly.
+- 🗄️ **Persistent Data**: Uses a MySQL database to store all lap data for later analysis.
+- 🚀 **High-Performance Backend**: An in-memory data store provides a highly responsive web interface that updates every second.
+- 📱 **Responsive Design**: A clean, mobile-friendly interface for easy viewing at the track.
 
-## 🎤 Voice Announcement Features
+## 🖥️ Web Interface
 
-### Individual Lap Announcements (Default: Simple Mode)
-- **Lap Completion**: "1:05.234" (time only)
-- **Best Lap Update**: "59.789秒、ベストラップ！" (Best lap!)
-- **New Record**: "新記録！59.789秒" (New record!)
+### Main Dashboard
+The main view is designed for at-a-glance information.
+- The table is sorted by the most recent pass, so the car that just crossed the line is always at the top.
+- Key performance indicators are visible for every car:
+  - **Ponder**: The car's number. Click to view the detailed history page.
+  - **Best Lap**: The single fastest lap since the server started.
+  - **Avg (10 Laps)**: A moving average of the last 10 laps.
+  - **Std Dev**: The standard deviation of lap times, indicating consistency.
+  - **Latest Lap**: The most recently completed lap time.
+  - **Last Pass**: The timestamp of the last time the car crossed the start/finish line.
+  - **Announce**: A checkbox to enable or disable voice announcements for that specific car.
 
-### Detailed Mode (Optional Settings)
-- **Lap Completion**: "3ラップ、1:05.234" (with lap number)
-- **With Car Number**: "カー5、3ラップ、1:05.234" (with car number)
+### Lap History Page
+- Accessible by clicking a ponder number on the main dashboard.
+- **Performance Summary**: Shows total laps, best lap, and the 10-lap average.
+- **Lap Time Chart**: A line graph that visually represents every lap time, making it easy to spot trends and inconsistencies.
+- **Full Lap Data**: A table listing every lap number, its time, and the time of day it was set.
 
-### All Cars Time Announcement (Default: Disabled)
-- **Automatic Announcement**: Optional 30-second interval announcements of all car positions
-- **Manual Announcement**: Trigger anytime via web interface button
-- **Example**: "現在の順位、1位、5ラップ、ベスト59.8秒、2位、4ラップ、ベスト1分2.1秒..."
-
-### Supported TTS Engines
-- **Google TTS (Recommended)**: Highest quality Japanese voice synthesis
-- **pyttsx3**: Offline voice synthesis
-- **espeak**: Backup voice engine
+## 🎤 Voice Announcements
+- Voice announcements can be enabled or disabled for each car individually using the checkbox on the main dashboard.
+- When enabled, the system will announce the car's number and its lap time as it crosses the line.
+- **Example**: "Ponder 5, 32.15"
 
 ## 📋 System Requirements
 
@@ -51,8 +55,8 @@ A professional timing system that displays lap times in real-time and announces 
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/hama-jp/AMB_RC_Timer.git
-cd AMB_RC_Timer
+git clone https://github.com/hama-jp/AMB_Lap_Speak.git
+cd AMB_Lap_Speak
 ```
 
 ### 2. Automatic Setup (Recommended)
@@ -78,14 +82,7 @@ uv venv
 source .venv/bin/activate
 
 # Install dependencies
-uv pip install PyYAML>=6.0
-grep -v "PyYAML" requirements.txt | uv pip install -r /dev/stdin
-
-# Install web interface packages
-uv pip install flask
-
-# Install voice announcement packages
-uv pip install gtts pygame
+uv pip install -r requirements.txt
 ```
 
 #### MySQL Database Setup
@@ -129,6 +126,8 @@ mysql_password: 'karts'
 
 ### 5. RC Car Information Registration (Optional)
 
+You can map transponder IDs to car numbers for easier identification.
+
 ```bash
 # Activate virtual environment
 source .venv/bin/activate
@@ -141,9 +140,8 @@ cursor = conn.cursor()
 
 # RC car information (car_number, transponder_id, driver_name)
 cars = [
-    (1, 4000822, 'Driver A'),
-    (2, 4000823, 'Driver B'),
-    (3, 4000824, 'Driver C'),
+    (1, 4000822, 'My Car 1'),
+    (2, 4000823, 'My Car 2'),
     # Add more as needed
 ]
 
@@ -177,106 +175,6 @@ python web_app.py
 
 **Web Interface Access**: http://localhost:5000
 
-## 🖥️ Web Interface Features
-
-### Live Timing Display
-- **Position**: Current standing based on lap count and best lap time
-- **Car Number**: Car number configured in database
-- **Driver Name**: Driver name configured in database
-- **Status**: Racing (completed laps) or On Track (recent activity)
-- **Lap Count**: Total completed laps
-- **Last Lap Time**: Most recent lap time
-- **Best Lap Time**: Fastest lap time (highlighted in green)
-- **Last Activity**: Time of most recent transponder pass
-
-### Recent Passes Display
-- Real-time feed of transponder detections
-- Shows transponder ID, signal strength, and timestamp
-- Auto-scrolls to show latest activity
-
-### 🎛️ Voice Control
-- **Voice Enable/Disable**: Toggle voice announcements on/off
-- **Volume Adjustment**: 0-100% volume control
-- **Speaking Rate**: 50-300 WPM speed adjustment
-- **Announcement Style**:
-  - **Include Car Numbers**: Off (default) / On
-  - **Include Lap Numbers**: Off (default) / On
-  - **Periodic All Times**: Off (default) / On (30-second intervals)
-- **Voice Test**: "音声テスト。RCカータイマーシステムが正常に動作しています。"
-- **Announce All Times**: Manual announcement of all current car times
-- **Race Reset**: Reset race state
-
-### Auto-refresh
-- Updates every 2 seconds
-- Live status indicator shows connection health
-- Displays up to 16 RC cars simultaneously
-
-## 🗄️ Database Schema
-
-The system uses 5 main tables:
-
-- **passes**: Raw transponder readings from AMB decoder
-- **laps**: Validated lap times within race sessions
-- **heats**: Race session management
-- **cars**: Transponder to RC car/driver mapping
-- **settings**: Runtime configuration storage
-
-## 🔧 Troubleshooting
-
-### AMB Decoder Connection Issues
-
-```bash
-# Test direct connection to decoder
-python -c "
-from AmbP3.decoder import Connection
-conn = Connection('192.168.1.21', 5403)  # Adjust IP address
-conn.connect()
-print('Connection successful!')
-conn.close()
-"
-```
-
-### MySQL Connection Issues
-
-```bash
-# Test database connection
-python -c "
-from AmbP3.write import open_mysql_connection
-conn = open_mysql_connection(user='kart', db='karts', password='karts', host='127.0.0.1', port=3307)
-print('Database connection successful!')
-conn.close()
-"
-```
-
-### Voice Output Issues
-
-```bash
-# Test voice engine
-python -c "
-from AmbP3.voice_announcer import VoiceAnnouncer
-announcer = VoiceAnnouncer(enabled=True, engine='auto')
-print(f'Voice engine in use: {announcer.engine_type}')
-announcer.test_voice()
-"
-```
-
-### System Status Check
-
-```bash
-# Check recent timing data
-tail -f /tmp/out.log
-
-# Check database activity
-python -c "
-from AmbP3.write import open_mysql_connection
-conn = open_mysql_connection(user='kart', db='karts', password='karts', host='127.0.0.1', port=3307)
-cursor = conn.cursor()
-cursor.execute('SELECT COUNT(*) FROM passes')
-print(f'Total passes: {cursor.fetchone()[0]}')
-conn.close()
-"
-```
-
 ## 🏗️ System Architecture
 
 ```
@@ -285,102 +183,41 @@ AMB P3 Decoder (Hardware)
 amb_client.py (Data Collection)
     ↓ Protocol Decoding
 MySQL Database (Data Storage)
-    ↓ Web API
-web_app.py (Flask Web Server)
+    ↓ Web API (on startup & for new laps)
+web_app.py (Flask Web Server with In-Memory Store)
     ↓ HTTP (Port 5000)
-Web Browser (Live Display)
+Web Browser (Live Display via polling)
     ↓ Audio Output
-Google TTS / pygame (Voice Announcements)
-```
-
-## 🧪 Development & Testing
-
-### Code Quality Check
-
-```bash
-# Run linter
-flake8
-```
-
-### Voice System Testing
-
-```bash
-# Test voice announcer independently
-python -c "
-from AmbP3.voice_announcer import VoiceAnnouncer
-announcer = VoiceAnnouncer(enabled=True, engine='auto')
-print(f'Engine type: {announcer.engine_type}')
-announcer.test_voice()
-"
-
-# Test individual lap announcement
-python -c "
-from AmbP3.voice_announcer import VoiceAnnouncer
-announcer = VoiceAnnouncer(enabled=True)
-announcer.announce_lap_time(5, 3, 65.234, is_best=True, simple_mode=True)
-"
+Voice Announcer (triggered by new laps in backend)
 ```
 
 ### File Structure
 
 ```
-AMB_RC_Timer/
+AMB_Lap_Speak/
 ├── AmbP3/                 # Core timing system package
-│   ├── config.py         # Configuration management
-│   ├── decoder.py        # AMB P3 protocol handling
-│   ├── records.py        # Protocol message definitions
-│   ├── write.py          # Database operations
-│   ├── voice_announcer.py # Voice announcement system
-│   └── ...
+│   ├── ...
+│   └── voice_announcer.py # Voice announcement system
 ├── templates/            # Web interface templates
-│   └── index.html       # Main dashboard
+│   ├── index.html       # Main dashboard
+│   └── laps.html        # Lap history detail page
 ├── amb_client.py        # Main timing client
 ├── web_app.py          # Flask web application
 ├── conf.yaml           # Configuration file
 ├── schema              # MySQL database schema
 ├── requirements.txt    # Python dependencies
 ├── setup.sh           # Automated setup script
-├── CLAUDE.md          # Development guidelines
 ├── README.md          # English README (this file)
 └── README_ja.md       # Japanese README
 ```
 
 ## 📚 API Reference
 
-### Main Endpoints
-
-- `GET /` - Main dashboard
-- `GET /api/lap_times` - Current lap times (JSON)
-- `GET /api/recent_passes` - Recent transponder passes (JSON)
-
-### Voice Control API
-
-- `GET /api/voice/settings` - Get voice settings
-- `POST /api/voice/settings` - Update voice settings
-- `POST /api/voice/test` - Test voice announcement
-- `POST /api/voice/announce` - Manual voice announcement
-- `POST /api/voice/announce_all` - Announce all car times
-- `GET/POST /api/voice/announcement_settings` - Announcement style settings
-
-### Race Management API
-
-- `POST /api/race/reset` - Reset race state
-
-## 🎯 Usage Examples
-
-### Basic Usage Flow
-
-1. **Set up AMB decoder and network configuration**
-2. **Setup and start the system**
-3. **Access dashboard via web browser**
-4. **Adjust voice settings as needed**
-5. **Start racing and monitor in real-time**
-
-### Voice Setting Use Cases
-
-- **Practice Sessions**: Simple mode (time only)
-- **Qualifying & Finals**: Detailed mode (with lap/car numbers)
-- **Endurance Races**: Enable periodic all-cars announcements
+- `GET /`: Serves the main dashboard page.
+- `GET /laps/<transponder_id>`: Serves the detailed lap history page for a specific ponder.
+- `GET /api/all_laps`: Returns a JSON list of the latest lap data for all active cars, sorted by the most recent pass. Used by the main dashboard.
+- `GET /api/laps/<transponder_id>`: Returns a JSON object with the complete history and statistics for a single car. Used by the lap history page.
+- `POST /api/voice_toggle/<transponder_id>`: Toggles the voice announcement setting for a specific car.
 
 ## 🤝 Contributing
 
@@ -393,40 +230,3 @@ AMB_RC_Timer/
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🔗 Related Projects
-
-- [AMB Web](https://github.com/vmindru/ambweb) - Alternative web interface
-- [AMB Docker](https://github.com/br0ziliy/amb-docker) - Docker deployment
-
-## 📞 Support
-
-For issues and questions:
-
-1. Check the troubleshooting section above
-2. Review logs in `/tmp/out.log` and `/tmp/amb_raw.log`
-3. Open an issue on GitHub with detailed error information
-
-## 📈 Roadmap
-
-- [ ] Export functionality (CSV, PDF)
-- [ ] Multiple race session management
-- [ ] Custom voice messages
-- [ ] Mobile app version
-- [ ] Cloud sync capabilities
-
-## 🙏 Acknowledgments
-
-This project uses the following technologies and libraries:
-
-- **AMB (Amsterdam Micro Broadcasting)** - P3 timing decoders
-- **Google Text-to-Speech** - High-quality Japanese voice synthesis
-- **Flask** - Web application framework
-- **MySQL** - Database management system
-- **pygame** - Audio playback library
-
----
-
-**Happy RC Racing! 🏎️🎌**
-
-*A professional timing system with Japanese voice announcements, built for RC car racing in Japan*
