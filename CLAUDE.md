@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-This is a Python client for AMB (Amsterdam Micro Broadcasting) P3 timing decoders, used in motorsport/karting timing systems. It connects to AMB hardware via TCP socket, decodes transponder timing data, and stores race information in MySQL.
+This is a Python client for AMB (Amsterdam Micro Broadcasting) P3 timing decoders, used in RC car racing timing systems. It connects to AMB hardware via TCP socket, decodes transponder timing data, and stores race information in MySQL.
 
 ## Common Development Commands
 
@@ -70,7 +70,7 @@ docker build -t ambp3client .
   - Logging paths and feature flags
 
 ### Database Schema
-Core tables: `passes` (raw transponder readings), `laps` (validated lap times), `heats` (race sessions), `karts` (transponder mappings), `settings` (runtime config)
+Core tables: `passes` (raw transponder readings), `laps` (validated lap times), `heats` (race sessions), `cars` (transponder mappings), `settings` (runtime config)
 
 ### Data Flow
 1. TCP connection to AMB P3 decoder hardware
@@ -89,4 +89,4 @@ Core tables: `passes` (raw transponder readings), `laps` (validated lap times), 
 - Uses Python 3.7 with mysql-connector for database operations
 - P3 protocol implementation with CRC16 validation
 - Designed for production karting timing applications
-- Race timing requires precise time synchronization between client and decoder
+- RC car timing requires precise time synchronization between client and decoder

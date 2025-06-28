@@ -170,7 +170,7 @@ Access the web interface at: **http://localhost:5000**
 
 ### Live Timing Display
 - **Position**: Current standing based on lap count and best lap time
-- **Kart Number**: Configured kart number from database
+- **Car Number**: Configured car number from database
 - **Driver Name**: Driver name from database
 - **Status**: Racing (completed laps) or On Track (recent activity)
 - **Lap Count**: Total completed laps
@@ -311,4 +311,4 @@ For issues and questions:
 
 ---
 
-**Happy Racing! 🏎️**
+**Happy RC Racing! 🏎️**

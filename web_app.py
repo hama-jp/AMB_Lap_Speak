@@ -30,10 +30,10 @@ def get_recent_passes(limit=50):
         p.rtc_time,
         p.strength,
         p.decoder_id,
-        k.kart_number,
-        k.name
+        c.car_number,
+        c.name
     FROM passes p
-    LEFT JOIN karts k ON p.transponder_id = k.transponder_id
+    LEFT JOIN cars c ON p.transponder_id = c.transponder_id
     ORDER BY p.rtc_time DESC
     LIMIT %s
     """
@@ -53,7 +53,7 @@ def get_recent_passes(limit=50):
             'raw_time': row[1],
             'strength': row[2],
             'decoder_id': row[3],
-            'kart_number': row[4] if row[4] else 'Unknown',
+            'car_number': row[4] if row[4] else 'Unknown',
             'driver_name': row[5] if row[5] else 'Unknown'
         })
     
@@ -70,11 +70,11 @@ def calculate_lap_times():
     SELECT 
         p.transponder_id,
         p.rtc_time,
-        k.kart_number,
-        k.name,
+        c.car_number,
+        c.name,
         p.strength
     FROM passes p
-    LEFT JOIN karts k ON p.transponder_id = k.transponder_id
+    LEFT JOIN cars c ON p.transponder_id = c.transponder_id
     ORDER BY p.transponder_id, p.rtc_time
     """
     
@@ -86,13 +86,13 @@ def calculate_lap_times():
     for row in results:
         transponder_id = row[0]
         rtc_time = row[1]
-        kart_number = row[2] if row[2] else 'Unknown'
+        car_number = row[2] if row[2] else 'Unknown'
         driver_name = row[3] if row[3] else 'Unknown'
         strength = row[4]
         
         if transponder_id not in transponder_data:
             transponder_data[transponder_id] = {
-                'kart_number': kart_number,
+                'car_number': car_number,
                 'driver_name': driver_name,
                 'passes': [],
                 'laps': [],
@@ -165,7 +165,7 @@ def api_lap_times():
             if show_kart:
                 results.append({
                     'transponder_id': transponder_id,
-                    'kart_number': data['kart_number'],
+                    'car_number': data['car_number'],
                     'driver_name': data['driver_name'],
                     'lap_count': data['lap_count'],
                     'last_lap_time': data['last_lap']['formatted_time'] if data['last_lap'] else '-',
@@ -182,7 +182,7 @@ def api_lap_times():
             x['last_activity'] if x['last_activity'] != '-' else '00:00:00'
         ), reverse=True)
         
-        # Limit to 16 karts maximum
+        # Limit to 16 cars maximum
         results = results[:16]
         
         return jsonify(results)
