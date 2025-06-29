@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lap History</title>
+    <title>ラップ履歴</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
@@ -85,16 +85,22 @@
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to Dashboard</a>
-        <h1 id="ponder-title">Lap History for Ponder...</h1>
+        <a href="/" class="back-link">&larr; ダッシュボードに戻る</a>
+        <h1 id="ponder-title">ポンダーのラップ履歴...</h1>
 
         <div id="stats-summary" class="stats-summary"></div>
 
         <div class="chart-container">
+            <h3>ニックネーム設定</h3>
+            <div style="margin-bottom: 20px;">
+                <label for="nickname-input" style="display: block; margin-bottom: 5px; color: #bdbdbd;">読み上げ用ニックネーム:</label>
+                <input type="text" id="nickname-input" placeholder="例: １番" style="padding: 8px; margin-right: 10px; background-color: #2c2c2c; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; width: 200px;">
+                <button id="save-nickname" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">保存</button>
+            </div>
             <canvas id="lap-chart"></canvas>
         </div>
 
-        <h2>Full Lap Data</h2>
+        <h2>全ラップデータ</h2>
         <div id="lap-history-table"></div>
 
     </div>
@@ -106,18 +112,21 @@
             try {
                 const response = await fetch(`/api/laps/${transponderId}`);
                 if (!response.ok) {
-                    throw new Error('Data not found for this ponder.');
+                    throw new Error('このポンダーのデータが見つかりません。');
                 }
                 const data = await response.json();
                 
-                document.getElementById('ponder-title').textContent = `Lap History for Ponder ${data.car_number}`;
+                document.getElementById('ponder-title').textContent = `ポンダー ${transponderId} のラップ履歴`;
+
+                // Set current nickname in input field
+                document.getElementById('nickname-input').value = data.nickname || '';
 
                 renderSummary(data);
                 renderChart(data.lap_history);
                 renderTable(data.lap_history);
 
             } catch (error) {
-                document.getElementById('ponder-title').textContent = 'Error';
+                document.getElementById('ponder-title').textContent = 'エラー';
                 document.body.innerHTML += `<div style="text-align:center; color: #ef5350;">${error.message}</div>`;
             }
         }
@@ -130,15 +139,15 @@
 
             summaryContainer.innerHTML = `
                 <div class="stat-item">
-                    <div class="label">Total Laps</div>
+                    <div class="label">総ラップ数</div>
                     <div class="value">${totalLaps}</div>
                 </div>
                 <div class="stat-item">
-                    <div class="label">Best Lap</div>
+                    <div class="label">ベストラップ</div>
                     <div class="value">${bestLap}</div>
                 </div>
                 <div class="stat-item">
-                    <div class="label">Average (Last 10)</div>
+                    <div class="label">平均(直近10周)</div>
                     <div class="value">${avgLap}</div>
                 </div>
             `;
@@ -150,9 +159,9 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Lap</th>
-                            <th>Lap Time</th>
-                            <th>Time of Day</th>
+                            <th>ラップ</th>
+                            <th>ラップタイム</th>
+                            <th>時刻</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -181,7 +190,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Lap Time (seconds)',
+                        label: 'ラップタイム(秒)',
                         data: lapTimes,
                         borderColor: '#4CAF50',
                         backgroundColor: 'rgba(76, 175, 80, 0.2)',
@@ -214,6 +223,28 @@
                 }
             });
         }
+
+        // Handle nickname save button
+        document.getElementById('save-nickname').addEventListener('click', async function() {
+            const nickname = document.getElementById('nickname-input').value;
+            try {
+                const response = await fetch(`/api/nickname/${transponderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ nickname: nickname }),
+                });
+                if (response.ok) {
+                    alert('ニックネームを保存しました');
+                } else {
+                    alert('ニックネームの保存に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error saving nickname:', error);
+                alert('ニックネームの保存に失敗しました');
+            }
+        });
 
         fetchDataAndRender();
 

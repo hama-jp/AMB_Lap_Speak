@@ -23,11 +23,12 @@ wcwidth==0.1.7
 
 # Web interface
 Flask>=2.0.0
+numpy>=1.21.0
 
 # Voice announcement system
 gTTS>=2.3.0
 pygame>=2.0.0
 pyttsx3>=2.90
 
-# Additional dependencies for TTS fallback
-espeak-ng; sys_platform == "linux"
+# Additional dependencies for TTS fallback (optional)
+# espeak-ng; sys_platform == "linux"  # Commented out due to installation issues on some systems

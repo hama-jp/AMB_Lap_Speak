@@ -15,18 +15,18 @@ This is a Python client for AMB (Amsterdam Micro Broadcasting) P3 timing decoder
 
 ### Development Setup
 ```bash
-# Create virtual environment with uv
+# Quick setup using provided script
+chmod +x setup.sh
+./setup.sh
+
+# Manual setup
 uv venv
-
-# Activate virtual environment
 source .venv/bin/activate
+uv pip install -r requirements.txt
 
-# Install dependencies (note: PyYAML 5.4 has issues with Python 3.11+)
-uv pip install PyYAML>=6.0
-grep -v "PyYAML" requirements.txt | uv pip install -r /dev/stdin
-
-# Install voice announcement dependencies
-uv pip install flask gtts pygame
+# Database setup with Docker (requires Docker Desktop)
+docker run -d --name mysql-amb -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=karts -e MYSQL_USER=kart -e MYSQL_PASSWORD=karts -p 3307:3306 mysql:5.7
+sleep 30 && cat schema | docker exec -i mysql-amb mysql -u kart -pkarts karts
 ```
 
 ### Code Quality
@@ -107,7 +107,7 @@ docker build -t ambp3client .
 
 ### Configuration
 - **conf.yaml**: Main configuration file containing:
-  - Decoder connection (default: 127.0.0.1:12000)
+  - Decoder connection (default: 192.168.1.21:5403)
   - MySQL database settings (default: localhost:3307)
   - Logging paths and feature flags
 
@@ -131,7 +131,13 @@ Core tables: `passes` (raw transponder readings), `laps` (validated lap times), 
 - **decode_one.py**: Single message decoder utility for debugging
 
 ## Development Notes
-- Uses Python 3.7 with mysql-connector for database operations
+- Uses Python 3.7+ with mysql-connector for database operations
 - P3 protocol implementation with CRC16 validation
-- Designed for production karting timing applications
+- Designed for production karting timing applications with focus on practice sessions
 - RC car timing requires precise time synchronization between client and decoder
+- Web interface uses in-memory data store for high-performance real-time updates
+- Voice announcements are per-ponder configurable through web interface
+- flake8 configuration uses 140 character line length (tox.ini)
+- Docker setup requires Docker Desktop on WSL/Windows environments
+- Web application requires numpy for data processing
+- espeak-ng dependency may fail on some systems (voice system defaults to gTTS)

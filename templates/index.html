@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RC Practice Lap Timer</title>
+    <title>RC 練習用ラップタイマー</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -94,9 +94,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>RC Practice Lap Timer</h1>
+        <h1>RC 練習用ラップタイマー</h1>
         <div id="lap-times-container">
-            <div class="loading">Loading lap times...</div>
+            <div class="loading">ラップタイムを読み込み中...</div>
         </div>
         <div id="last-update"></div>
     </div>
@@ -111,10 +111,10 @@
                 }
                 const laps = await response.json();
                 renderTable(laps);
-                document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('last-update').textContent = `最終更新: ${new Date().toLocaleTimeString()}`;
             } catch (error) {
                 const container = document.getElementById('lap-times-container');
-                container.innerHTML = `<div class="error">Could not load data. Is the server running?</div>`;
+                container.innerHTML = `<div class="error">データを読み込めませんでした。サーバーは動作していますか？</div>`;
                 console.error('Fetch error:', error);
             }
         }
@@ -123,7 +123,7 @@
         function renderTable(laps) {
             const container = document.getElementById('lap-times-container');
             if (laps.length === 0) {
-                container.innerHTML = '<div class="loading">Waiting for the first lap...</div>';
+                container.innerHTML = '<div class="loading">最初のラップを待機中...</div>';
                 return;
             }
 
@@ -131,13 +131,14 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Ponder</th>
-                            <th>Best Lap</th>
-                            <th>Avg (10 Laps)</th>
-                            <th>Std Dev</th>
-                            <th>Latest Lap</th>
-                            <th>Last Pass</th>
-                            <th>Announce</th>
+                            <th>ポンダー</th>
+                            <th>ニックネーム</th>
+                            <th>ベストラップ</th>
+                            <th>平均(10周)</th>
+                            <th>標準偏差</th>
+                            <th>最新ラップ</th>
+                            <th>最終通過</th>
+                            <th>アナウンス</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -146,7 +147,8 @@
             laps.forEach(lap => {
                 tableHtml += `
                     <tr>
-                        <td><a href="/laps/${lap.ponder_id}" class="ponder-link">${lap.car_number}</a></td>
+                        <td><a href="/laps/${lap.ponder_id}" class="ponder-link">${lap.ponder_id}</a></td>
+                        <td style="font-style: italic; color: #81c784;">${lap.nickname || '-'}</td>
                         <td class="lap-time best-lap">${lap.best_lap_time}</td>
                         <td class="lap-time stats">${lap.moving_avg_10}</td>
                         <td class="lap-time stats">${lap.std_dev}</td>

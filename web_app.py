@@ -90,7 +90,8 @@ def update_data_from_db():
                                 'latest_lap': None,
                                 'moving_avg_10': None,
                                 'std_dev': None,
-                                'voice_enabled': False # Voice is off by default for all ponders.
+                                'voice_enabled': False, # Voice is off by default for all ponders.
+                                'nickname': '' # Nickname for voice announcements
                             }
                         
                         pd = ponder_data[ponder_id]
@@ -128,7 +129,15 @@ def update_data_from_db():
 
                                 # Announce the lap time if voice is enabled for this ponder.
                                 if pd['voice_enabled']:
-                                    announcement = f"Ponder {pd['car_number']}, {lap_time:.2f}"
+                                    # Use nickname if available, otherwise use car_number
+                                    identifier = pd['nickname'] if pd['nickname'] else pd['car_number']
+                                    # Format time in Japanese style: 12.24 -> "12秒24" (じゅうにびょう にーよん)
+                                    seconds = int(lap_time)
+                                    hundredths = int((lap_time - seconds) * 100)
+                                    if hundredths > 0:
+                                        announcement = f"{identifier}、{seconds}秒{hundredths:02d}"
+                                    else:
+                                        announcement = f"{identifier}、{seconds}秒"
                                     voice_announcer.announce(announcement)
 
                         # Update the last pass time to the current one for the next calculation.
@@ -178,7 +187,8 @@ def initialize_data():
                      ponder_data[ponder_id] = {
                         'transponder_id': ponder_id, 'car_number': passes[0]['car_number'] or 'Unknown',
                         'last_pass_time': None, 'laps': [], 'lap_history': [], 'best_lap': float('inf'),
-                        'latest_lap': None, 'moving_avg_10': None, 'std_dev': None, 'voice_enabled': False
+                        'latest_lap': None, 'moving_avg_10': None, 'std_dev': None, 'voice_enabled': False,
+                        'nickname': ''
                     }
                 pd = ponder_data[ponder_id]
 
@@ -241,7 +251,8 @@ def api_all_laps():
                     'moving_avg_10': f"{pd['moving_avg_10']:.3f}" if pd['moving_avg_10'] is not None else '-',
                     'std_dev': f"{pd['std_dev']:.3f}" if pd['std_dev'] is not None else '-',
                     'timestamp': lap_record['timestamp'].strftime('%H:%M:%S'),
-                    'voice_enabled': pd['voice_enabled']
+                    'voice_enabled': pd['voice_enabled'],
+                    'nickname': pd['nickname']
                 })
     return jsonify(response_data)
 
@@ -267,6 +278,19 @@ def api_voice_toggle(transponder_id):
             ponder_data[transponder_id]['voice_enabled'] = new_state
             print(f"Set voice for ponder {transponder_id} to {new_state}")
             return jsonify({'status': 'success', 'new_state': new_state})
+        else:
+            return jsonify({'error': 'Transponder not found'}), 404
+
+@app.route('/api/nickname/<int:transponder_id>', methods=['POST'])
+def api_nickname_update(transponder_id):
+    """API endpoint to update the nickname for a specific ponder."""
+    with data_lock:
+        if transponder_id in ponder_data:
+            data = request.get_json()
+            new_nickname = data.get('nickname', '')
+            ponder_data[transponder_id]['nickname'] = new_nickname
+            print(f"Set nickname for ponder {transponder_id} to '{new_nickname}'")
+            return jsonify({'status': 'success', 'nickname': new_nickname})
         else:
             return jsonify({'error': 'Transponder not found'}), 404
 
