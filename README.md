@@ -12,6 +12,8 @@ This system is designed to help individual drivers improve their skills by provi
 - 📈 **In-Depth Statistics**: For each car, view the best lap, 10-lap moving average, and standard deviation to gauge consistency.
 - 📊 **Visual Lap History**: Click on any ponder to see a detailed lap history page with a chart visualizing lap time progression.
 - 🗣️ **Per-Ponder Voice Announcements**: Toggle Japanese voice announcements for individual cars, so you only hear the times you care about.
+- 🏷️ **Custom Nicknames**: Set custom nicknames for voice announcements to easily identify multiple cars during practice sessions.
+- 🇯🇵 **Japanese Interface**: Fully localized Japanese web interface with natural time formatting for voice announcements.
 - ⏱️ **Real-time Data**: Connects to AMB P3 decoders to capture transponder passes instantly.
 - 🗄️ **Persistent Data**: Uses a MySQL database to store all lap data for later analysis.
 - 🚀 **High-Performance Backend**: An in-memory data store provides a highly responsive web interface that updates every second.
@@ -23,7 +25,8 @@ This system is designed to help individual drivers improve their skills by provi
 The main view is designed for at-a-glance information.
 - The table is sorted by the most recent pass, so the car that just crossed the line is always at the top.
 - Key performance indicators are visible for every car:
-  - **Ponder**: The car's number. Click to view the detailed history page.
+  - **Ponder**: The transponder ID. Click to view the detailed history page.
+  - **Nickname**: Custom name for voice announcements (shows "-" if not set).
   - **Best Lap**: The single fastest lap since the server started.
   - **Avg (10 Laps)**: A moving average of the last 10 laps.
   - **Std Dev**: The standard deviation of lap times, indicating consistency.
@@ -33,14 +36,19 @@ The main view is designed for at-a-glance information.
 
 ### Lap History Page
 - Accessible by clicking a ponder number on the main dashboard.
+- **Nickname Setting**: Input field to set a custom name for voice announcements.
 - **Performance Summary**: Shows total laps, best lap, and the 10-lap average.
 - **Lap Time Chart**: A line graph that visually represents every lap time, making it easy to spot trends and inconsistencies.
 - **Full Lap Data**: A table listing every lap number, its time, and the time of day it was set.
 
 ## 🎤 Voice Announcements
 - Voice announcements can be enabled or disabled for each car individually using the checkbox on the main dashboard.
-- When enabled, the system will announce the car's number and its lap time as it crosses the line.
-- **Example**: "Ponder 5, 32.15"
+- Set custom nicknames for each car in the lap history page for easier identification during multi-car sessions.
+- When enabled, the system will announce the nickname (or transponder ID if no nickname is set) and lap time in Japanese format.
+- **Examples**: 
+  - With nickname: "１番、65秒24" (pronounced: "ichiban, rokujūgo-byō ni-yon")
+  - Without nickname: "4000822、65秒24" (pronounced: "yonhyaku-man happyaku nijūni, rokujūgo-byō ni-yon")
+- Time format uses Japanese-style pronunciation where "65.24" becomes "65秒24" for clearer digit recognition.
 
 ## 📋 System Requirements
 
@@ -218,6 +226,7 @@ AMB_Lap_Speak/
 - `GET /api/all_laps`: Returns a JSON list of the latest lap data for all active cars, sorted by the most recent pass. Used by the main dashboard.
 - `GET /api/laps/<transponder_id>`: Returns a JSON object with the complete history and statistics for a single car. Used by the lap history page.
 - `POST /api/voice_toggle/<transponder_id>`: Toggles the voice announcement setting for a specific car.
+- `POST /api/nickname/<transponder_id>`: Updates the custom nickname for voice announcements for a specific car.
 
 ## 🤝 Contributing
 
