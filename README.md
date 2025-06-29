@@ -157,6 +157,38 @@ print('RC car data added successfully')
 
 ## 🏃‍♂️ Running the System
 
+### Using Docker Compose (Recommended)
+
+This is the easiest way to run the entire system, including the database.
+
+1.  **Configure Decoder IP:**
+    Open `docker-compose.yml` and set the `AMB_IP` environment variable for the `client` service to your AMB P3 decoder's IP address.
+
+    ```yaml
+    services:
+      client:
+        # ...
+        environment:
+          - AMB_IP=192.168.1.21 # <-- CHANGE THIS
+    ```
+
+2.  **Start the System:**
+
+    ```bash
+    docker compose up --build
+    ```
+
+    This command will:
+    - Build the Docker image for the application.
+    - Start the MySQL database container.
+    - Start the `app` (web server) and `client` (data collector) containers.
+    - Automatically create the database schema.
+
+3.  **Access the Web Interface:**
+    Open your browser and go to `http://localhost:5000`
+
+### Manual Execution
+
 ### 1. Start AMB Client (Data Collection)
 
 ```bash

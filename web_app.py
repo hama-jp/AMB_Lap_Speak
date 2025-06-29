@@ -5,6 +5,7 @@ from datetime import datetime
 import time
 import threading
 import numpy as np
+import os
 from AmbP3.voice_announcer import VoiceAnnouncer
 
 # --- Initialization ---
@@ -15,8 +16,8 @@ voice_announcer = VoiceAnnouncer(enabled=True, engine='auto')
 DB_CONFIG = {
     'user': 'kart',
     'password': 'karts',
-    'host': '127.0.0.1',
-    'port': 3307,
+    'host': os.getenv('MYSQL_HOST', '127.0.0.1'),
+    'port': 3306, # Docker uses the default port
     'database': 'karts'
 }
 

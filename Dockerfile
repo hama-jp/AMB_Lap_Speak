@@ -1,9 +1,11 @@
 FROM python:3.7-alpine
 
-RUN apk add gcc musl-dev mariadb-dev
+RUN apk add --no-cache gcc musl-dev mariadb-dev
 
-RUN pip install --upgrade pip
+WORKDIR /app
 
-WORKDIR /code
 COPY requirements.txt .
-RUN pip install -r ./requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .

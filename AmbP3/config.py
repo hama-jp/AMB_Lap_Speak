@@ -1,4 +1,5 @@
 import yaml
+import os
 from argparse import ArgumentParser
 
 DEFAULT_PORT = 5403
@@ -24,6 +25,7 @@ class Config:
                 if v is None:
                     del cli_args_dict[k]
             conf = {**DefaultConfig,  **config_from_file}
+            conf = {**conf, **os.environ}
             conf = {**cli_args_dict, **conf}
             conf = {**conf, **cli_args_dict}
             print(f"args: {cli_args_dict}")

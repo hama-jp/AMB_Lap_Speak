@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:5.7
+    container_name: mysql-amb
+    restart: always
+    environment:
+      MYSQL_DATABASE: karts
+      MYSQL_USER: kart
+      MYSQL_PASSWORD: karts
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./schema:/docker-entrypoint-initdb.d/schema.sql
+
+  app:
+    build: .
+    container_name: amb_app
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    environment:
+      - MYSQL_HOST=db
+      - FLASK_APP=web_app.py
+    command: >
+      bash -c "
+        ./wait-for-it.sh db:3306 --
+        flask run --host=0.0.0.0
+      "
+
+  client:
+    build: .
+    container_name: amb_client
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - MYSQL_HOST=db
+      - AMB_IP=192.168.1.21 # This should be the IP of your AMB decoder
+    command: >
+      bash -c "
+        ./wait-for-it.sh db:3306 --
+        python amb_client.py
+      "
+
+volumes:
+  db_data:
